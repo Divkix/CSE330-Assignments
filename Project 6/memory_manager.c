@@ -1,12 +1,14 @@
-//
-// Created by chang on 10/15/23.
-//
 #include <linux/mm.h>
 #include <linux/sched/mm.h>
 #include <linux/module.h>
+#include <linux/init.h>
+#include <linux/highmem.h>
+#include <linux/ktime.h>
+#include <linux/hrtimer.h>
 
-// TODO 1: Define your input parameter (pid - int) here
-// Then use module_param to pass them from insmod command line. (--Assignment 2)
+// Define the input parameter for the process ID
+static int pid = -1;
+module_param(pid, int, 0644);
 
 struct task_struct *task = NULL;
 // Initialize memory statistics variables
@@ -25,31 +27,54 @@ static void parse_vma(void)
         if (task && task->mm)
         {
             mm = task->mm;
-            // TODO 2: mm_struct to initialize the VMA_ITERATOR (-- Assignment 4)
-            // Hint: Only one line of code is needed
+            // Initialize the VMA iterator
+            for (vma = mm->mmap; vma; vma = vma->vm_next)
+            {
+                unsigned long page;
+                for (page = vma->vm_start; page < vma->vm_end; page += PAGE_SIZE)
+                {
+                    pgd_t *pgd = pgd_offset(mm, page);
+                    if (pgd_none(*pgd) || pgd_bad(*pgd))
+                        continue;
 
-            // TODO 3: Iterate through the VMA linked list with for_each_vma (-- Assignment 4)
-            // Hint: Only one line of code is needed
+                    p4d_t *p4d = p4d_offset(pgd, page);
+                    if (p4d_none(*p4d) || p4d_bad(*p4d))
+                        continue;
 
-            // TODO 4: Iterate through each page of the VMA
-            // declear "page" as unsigned long, start from vma->vm_start to vma->vm_end with PAGE_SIZE step
-            // Hint: Only one line of code is needed
+                    pud_t *pud = pud_offset(p4d, page);
+                    if (pud_none(*pud) || pud_bad(*pud))
+                        continue;
 
-            // TODO 5: Use pgd_offset, p4d_offset, pud_offset, pmd_offset, pte_offset_map to get the page table entry
-            // Hint: Copy from Background Knowledge in the instruction
-            // Hint: change the address in the instruction to "page" variable you defined above
+                    pmd_t *pmd = pmd_offset(pud, page);
+                    if (pmd_none(*pmd) || pmd_bad(*pmd))
+                        continue;
 
-            // TODO 6: use pte_none(pte) to check if the page table entry is valid
-            // Hint: one if statement here
+                    pte_t *pte = pte_offset_map(pmd, page);
+                    if (!pte)
+                        continue;
 
-            // TODO 7: use pte_present(pte) to check if the page is in memory, otherwise it is in swap
+                    if (!pte_none(*pte))
+                    {
+                        if (pte_present(*pte))
+                        {
+                            total_rss++;
+                        }
+                        else
+                        {
+                            total_swap++;
+                        }
 
-            // TODO 8: use pte_young(pte) to check if the page is actively used
-            // if it is actively used, update wss and clear the accessed bit by: "test_and_clear_bit(_PAGE_BIT_ACCESSED,(unsigned long *)ppte);"
+                        if (pte_young(*pte))
+                        {
+                            total_wss++;
+                            test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)pte);
+                        }
+                    }
+                    pte_unmap(pte);
+                }
+            }
         }
     }
-}
-}
 }
 
 unsigned long timer_interval_ns = 10e9; // 10 sec timer
@@ -95,4 +120,4 @@ module_exit(memory_cleanup);
 MODULE_VERSION("0.1");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Your Name");
-MODULE_DESCRIPTION("CSE330 Project 2 Memory Management\n");
+MODULE_DESCRIPTION("CSE330 Project 2 Memory Management");
