@@ -119,5 +119,5 @@ module_exit(memory_cleanup);
 
 MODULE_VERSION("0.1");
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Your Name");
+MODULE_AUTHOR("Divanshu Chauhan");
 MODULE_DESCRIPTION("CSE330 Project 2 Memory Management");
