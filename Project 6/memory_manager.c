@@ -93,7 +93,7 @@ enum hrtimer_restart timer_callback(struct hrtimer *timer_for_restart)
 
 int memory_init(void)
 {
-    printk("CSE330 Project 3 Kernel Module Inserted\n");
+    printk("CSE330 Project Kernel Module Inserted\n");
     ktime_t ktime;
     ktime = ktime_set(0, timer_interval_ns);
     hrtimer_init(&hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -108,7 +108,7 @@ void memory_cleanup(void)
     ret = hrtimer_cancel(&hr_timer);
     if (ret)
         printk("HR Timer cancelled ...\n");
-    printk("CSE330 Project 3 Kernel Module Removed\n");
+    printk("CSE330 Project Kernel Module Removed\n");
 }
 
 module_init(memory_init);
@@ -116,5 +116,5 @@ module_exit(memory_cleanup);
 
 MODULE_VERSION("0.1");
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Jalpan Kishorbhai Pansuriya, Smitrajsinh Bhagirathsinh Sarvaiya, Ridham Shah");
-MODULE_DESCRIPTION("CSE330 Project 3 Memory Management\n");
+MODULE_AUTHOR("Divanshu Chauhan");
+MODULE_DESCRIPTION("CSE330 Project 6: Virtual Memory Traversal");
