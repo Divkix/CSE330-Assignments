@@ -1,17 +1,18 @@
+#include <linux/kernel.h>
+#include <linux/hrtimer.h>
+#include <linux/ktime.h>
 #include <linux/mm.h>
 #include <linux/sched/mm.h>
 #include <linux/module.h>
-#include <linux/init.h>
-#include <linux/highmem.h>
-#include <linux/ktime.h>
-#include <linux/hrtimer.h>
+#include <linux/sched.h>
+#include <linux/hugetlb.h>
+#define _PAGE_BIT_ACCESSED 5
 
-// Define the input parameter for the process ID
-static int pid = -1;
+static int pid = 0;
 module_param(pid, int, 0644);
 
 struct task_struct *task = NULL;
-// Initialize memory statistics variables
+
 unsigned long total_rss = 0;
 unsigned long total_swap = 0;
 unsigned long total_wss = 0;
@@ -27,50 +28,46 @@ static void parse_vma(void)
         if (task && task->mm)
         {
             mm = task->mm;
-            // Initialize the VMA iterator
-            for (vma = mm->mmap; vma; vma = vma->vm_next)
+
+            VMA_ITERATOR(vmi_iter, mm, 0);
+
+            for_each_vma(vmi_iter, vma)
             {
-                unsigned long page;
-                for (page = vma->vm_start; page < vma->vm_end; page += PAGE_SIZE)
+
+                for (unsigned long page = vma->vm_start; page < vma->vm_end; page += PAGE_SIZE)
                 {
-                    pgd_t *pgd = pgd_offset(mm, page);
-                    if (pgd_none(*pgd) || pgd_bad(*pgd))
-                        continue;
 
-                    p4d_t *p4d = p4d_offset(pgd, page);
-                    if (p4d_none(*p4d) || p4d_bad(*p4d))
-                        continue;
+                    pgd_t *pgd;
+                    p4d_t *p4d;
+                    pmd_t *pmd;
+                    pud_t *pud;
+                    pte_t *ptep, pte;
 
-                    pud_t *pud = pud_offset(p4d, page);
-                    if (pud_none(*pud) || pud_bad(*pud))
-                        continue;
+                    pgd = pgd_offset(mm, page);
+                    p4d = p4d_offset(pgd, page);
+                    pud = pud_offset(p4d, page);
+                    pmd = pmd_offset(pud, page);
+                    ptep = pte_offset_kernel(pmd, page);
+                    pte = *ptep;
 
-                    pmd_t *pmd = pmd_offset(pud, page);
-                    if (pmd_none(*pmd) || pmd_bad(*pmd))
-                        continue;
-
-                    pte_t *pte = pte_offset_map(pmd, page);
-                    if (!pte)
-                        continue;
-
-                    if (!pte_none(*pte))
+                    if (!pte_none(pte))
                     {
-                        if (pte_present(*pte))
+
+                        if (pte_present(pte))
                         {
                             total_rss++;
+
+                            if (pte_young(pte))
+                            {
+                                total_wss++;
+                                test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)ptep);
+                            }
                         }
                         else
                         {
                             total_swap++;
                         }
-
-                        if (pte_young(*pte))
-                        {
-                            total_wss++;
-                            test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)pte);
-                        }
                     }
-                    pte_unmap(pte);
                 }
             }
         }
@@ -96,7 +93,7 @@ enum hrtimer_restart timer_callback(struct hrtimer *timer_for_restart)
 
 int memory_init(void)
 {
-    printk("CSE330 Project 2 Kernel Module Inserted\n");
+    printk("CSE330 Project 3 Kernel Module Inserted\n");
     ktime_t ktime;
     ktime = ktime_set(0, timer_interval_ns);
     hrtimer_init(&hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -111,7 +108,7 @@ void memory_cleanup(void)
     ret = hrtimer_cancel(&hr_timer);
     if (ret)
         printk("HR Timer cancelled ...\n");
-    printk("CSE330 Project 2 Kernel Module Removed\n");
+    printk("CSE330 Project 3 Kernel Module Removed\n");
 }
 
 module_init(memory_init);
@@ -119,5 +116,5 @@ module_exit(memory_cleanup);
 
 MODULE_VERSION("0.1");
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Divanshu Chauhan");
-MODULE_DESCRIPTION("CSE330 Project 2 Memory Management");
+MODULE_AUTHOR("Jalpan Kishorbhai Pansuriya, Smitrajsinh Bhagirathsinh Sarvaiya, Ridham Shah");
+MODULE_DESCRIPTION("CSE330 Project 3 Memory Management\n");
